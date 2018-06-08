@@ -1,6 +1,7 @@
 local middleclass = {
-  _VERSION     = 'middleclass v3.0.0',
+  _VERSION     = 'middleclass v3.1.0',
   _DESCRIPTION = 'Object Orientation for Lua',
+  _URL         = 'https://github.com/kikito/middleclass',
   _LICENSE     = [[
     MIT LICENSE
 
@@ -35,7 +36,7 @@ local function _setClassDictionariesMetatables(aClass)
   if super then
     local superStatic = super.static
     setmetatable(dict, super.__instanceDict)
-    setmetatable(aClass.static, { __index = function(_,k) return dict[k] or superStatic[k] end })
+    setmetatable(aClass.static, { __index = function(_,k) return rawget(dict,k) or superStatic[k] end })
   else
     setmetatable(aClass.static, { __index = function(_,k) return dict[k] end })
   end
@@ -96,8 +97,9 @@ end
 
 local Object = _createClass("Object", nil)
 
-Object.static.__metamethods = { '__add', '__call', '__concat', '__div', '__le', '__lt',
-                                '__mod', '__mul', '__pow', '__sub', '__tostring', '__unm' }
+Object.static.__metamethods = { '__add', '__band', '__bor', '__bxor', '__bnot', '__call', '__concat',
+                                '__div', '__eq', '__ipairs', '__idiv', '__le', '__len', '__lt', '__mod',
+                                '__mul', '__pairs', '__pow', '__shl', '__shr', '__sub', '__tostring', '__unm' }
 
 function Object.static:allocate()
   assert(type(self) == 'table', "Make sure that you are using 'Class:allocate' instead of 'Class.allocate'")
