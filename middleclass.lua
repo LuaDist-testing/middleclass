@@ -1,5 +1,5 @@
 local middleclass = {
-  _VERSION     = 'middleclass v3.1.0',
+  _VERSION     = 'middleclass v3.2.0',
   _DESCRIPTION = 'Object Orientation for Lua',
   _URL         = 'https://github.com/kikito/middleclass',
   _LICENSE     = [[
@@ -28,6 +28,13 @@ local middleclass = {
   ]]
 }
 
+local _metamethods = {}
+for m in ([[ add band bor bxor bnot call concat div eq
+             gc ipairs idiv le len lt metatable mod mode
+             mul pairs pow shl shr sub tostring unm ]]):gmatch("%S+") do
+  _metamethods['__' .. m] = true
+end
+
 local function _setClassDictionariesMetatables(aClass)
   local dict = aClass.__instanceDict
   dict.__index = dict
@@ -35,24 +42,50 @@ local function _setClassDictionariesMetatables(aClass)
   local super = aClass.super
   if super then
     local superStatic = super.static
-    setmetatable(dict, super.__instanceDict)
+    setmetatable(dict, { __index = super.__instanceDict })
     setmetatable(aClass.static, { __index = function(_,k) return rawget(dict,k) or superStatic[k] end })
   else
     setmetatable(aClass.static, { __index = function(_,k) return dict[k] end })
   end
 end
 
+local function _propagateMetamethod(aClass, name, f)
+  for subclass in pairs(aClass.subclasses) do
+    if not subclass.__metamethods[name] then
+      subclass.__instanceDict[name] = f
+      _propagateMetamethod(subclass, name, f)
+    end
+  end
+end
+
+local function _updateClassDict(aClass, key, value)
+  if _metamethods[key] then
+    if value == nil then
+      aClass.__metamethods[key] = nil
+      if aClass.super then
+        value = aClass.super.__instanceDict[key]
+      end
+    else
+      aClass.__metamethods[key] = true
+    end
+
+    _propagateMetamethod(aClass, key, value)
+  end
+
+  aClass.__instanceDict[key] = value
+end
+
 local function _setClassMetatable(aClass)
   setmetatable(aClass, {
     __tostring = function() return "class " .. aClass.name end,
     __index    = aClass.static,
-    __newindex = aClass.__instanceDict,
+    __newindex = _updateClassDict,
     __call     = function(self, ...) return self:new(...) end
   })
 end
 
 local function _createClass(name, super)
-  local aClass = { name = name, super = super, static = {}, __mixins = {}, __instanceDict={} }
+  local aClass = { name = name, super = super, static = {}, __mixins = {}, __instanceDict = {}, __metamethods = {} }
   aClass.subclasses = setmetatable({}, {__mode = "k"})
 
   _setClassDictionariesMetatables(aClass)
@@ -61,17 +94,9 @@ local function _createClass(name, super)
   return aClass
 end
 
-local function _createLookupMetamethod(aClass, name)
-  return function(...)
-    local method = aClass.super[name]
-    assert( type(method)=='function', tostring(aClass) .. " doesn't implement metamethod '" .. name .. "'" )
-    return method(...)
-  end
-end
-
-local function _setClassMetamethods(aClass)
-  for _,m in ipairs(aClass.__metamethods) do
-    aClass[m]= _createLookupMetamethod(aClass, m)
+local function _setSubclassMetamethods(aClass, subclass)
+  for m in pairs(_metamethods) do
+    subclass.__instanceDict[m] = aClass.__instanceDict[m]
   end
 end
 
@@ -97,10 +122,6 @@ end
 
 local Object = _createClass("Object", nil)
 
-Object.static.__metamethods = { '__add', '__band', '__bor', '__bxor', '__bnot', '__call', '__concat',
-                                '__div', '__eq', '__ipairs', '__idiv', '__le', '__len', '__lt', '__mod',
-                                '__mul', '__pairs', '__pow', '__shl', '__shr', '__sub', '__tostring', '__unm' }
-
 function Object.static:allocate()
   assert(type(self) == 'table', "Make sure that you are using 'Class:allocate' instead of 'Class.allocate'")
   return setmetatable({ class = self }, self.__instanceDict)
@@ -117,7 +138,7 @@ function Object.static:subclass(name)
   assert(type(name) == "string", "You must provide a name(string) for your class")
 
   local subclass = _createClass(name, self)
-  _setClassMetamethods(subclass)
+  _setSubclassMetamethods(self, subclass)
   _setDefaultInitializeMethod(subclass, self)
   self.subclasses[subclass] = true
   self:subclassed(subclass)
