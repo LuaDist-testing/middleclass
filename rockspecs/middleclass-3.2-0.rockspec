@@ -1,17 +1,9 @@
--- This file was automatically generated for the LuaDist project.
-
 package = "middleclass"
 version = "3.2-0"
--- LuaDist source
 source = {
-  tag = "3.2-0",
-  url = "git://github.com/LuaDist-testing/middleclass.git"
+  url = "https://github.com/kikito/middleclass/archive/v3.2.0.tar.gz",
+  dir = "middleclass-3.2.0"
 }
--- Original source
--- source = {
---   url = "https://github.com/kikito/middleclass/archive/v3.2.0.tar.gz",
---   dir = "middleclass-3.2.0"
--- }
 description = {
    summary = "A simple OOP library for Lua",
    detailed = "It has inheritance, metamethods (operators), class variables and weak mixin support",
